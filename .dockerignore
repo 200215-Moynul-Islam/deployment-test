@@ -1,0 +1,15 @@
+# Build artifacts
+bin/
+obj/
+
+# IDE / editor settings
+.vs/
+.vscode/
+
+# Git
+.git
+.gitignore
+
+# Docker files
+Dockerfile
+docker-compose.yml
