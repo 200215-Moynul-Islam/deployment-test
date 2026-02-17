@@ -1,6 +1,7 @@
 using System.Text;
 using ELTBackend.Data;
 using ELTBackend.Mappings;
+using ELTBackend.Middleware;
 using ELTBackend.Repositories;
 using ELTBackend.Services;
 using ELTBackend.Utilities;
@@ -9,7 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using MovieHub.API.Middleware;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,6 +100,23 @@ builder
 // Register Authorization
 builder.Services.AddAuthorization();
 
+// Configure Serilog
+var logLevel = builder.Configuration.GetValue("Logging:LogLevel:Default", "Information");
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Is(Enum.Parse<LogEventLevel>(logLevel, ignoreCase: true))
+    .Enrich.FromLogContext() // Enables LogContext.PushProperty
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties}{NewLine}{Exception}"
+    )
+    .WriteTo.File(
+        "Logs/log-.txt",
+        rollingInterval: RollingInterval.Day,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties}{NewLine}{Exception}"
+    )
+    .CreateLogger();
+
+builder.Host.UseSerilog(); // Replace default logger
+
 // Register all the service classes
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -121,6 +140,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors();

@@ -3,7 +3,7 @@ using ELTBackend.Constants;
 using ELTBackend.Exceptions;
 using ELTBackend.Utilities;
 
-namespace MovieHub.API.Middleware
+namespace ELTBackend.Middleware
 {
     public class ExceptionHandlingMiddleware
     {
@@ -14,10 +14,15 @@ namespace MovieHub.API.Middleware
             { typeof(NotFoundException), StatusCodes.Status404NotFound },
             { typeof(ConflictException), StatusCodes.Status409Conflict },
         };
+        private readonly ILogger<ExceptionHandlingMiddleware> _logger;
 
-        public ExceptionHandlingMiddleware(RequestDelegate next)
+        public ExceptionHandlingMiddleware(
+            RequestDelegate next,
+            ILogger<ExceptionHandlingMiddleware> logger
+        )
         {
             _next = next;
+            _logger = logger;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -28,6 +33,13 @@ namespace MovieHub.API.Middleware
             }
             catch (BusinessException ex)
             {
+                _logger.LogWarning(
+                    "Business exception occurred. Type={ExceptionType}, Message={Message}, Path={Path}",
+                    ex.GetType().Name,
+                    ex.Message,
+                    context.Request.Path
+                );
+
                 context.Response.ContentType = MediaTypeNames.Application.Json;
 
                 if (_businessExceptionInfo.TryGetValue(ex.GetType(), out var statusCode))
@@ -47,8 +59,15 @@ namespace MovieHub.API.Middleware
                     );
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(
+                    ex,
+                    "Unhandled system exception. Path={Path}, Method={Method}",
+                    context.Request.Path,
+                    context.Request.Method
+                );
+
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 context.Response.ContentType = MediaTypeNames.Application.Json;
                 await context.Response.WriteAsJsonAsync(

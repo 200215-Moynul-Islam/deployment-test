@@ -13,10 +13,12 @@ namespace ELTBackend.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly ILogger<UserController> _logger;
 
-        public UserController(IUserService userService)
+        public UserController(IUserService userService, ILogger<UserController> logger)
         {
             _userService = userService;
+            _logger = logger;
         }
 
         // POST: api/users/register
@@ -26,9 +28,18 @@ namespace ELTBackend.Controllers
             [FromBody] UserCreateDto userCreateDto
         )
         {
+            _logger.LogInformation(
+                "User creation requested by Admin. Email={Email}",
+                userCreateDto.Email
+            );
+
+            var createdUser = await _userService.CreateUserAsync(userCreateDto);
+
+            _logger.LogInformation("User created successfully. UserId={UserId}", createdUser.Id);
+
             return StatusCode(
                 StatusCodes.Status201Created,
-                ResponseHelper.Success(data: await _userService.CreateUserAsync(userCreateDto))
+                ResponseHelper.Success(data: createdUser)
             );
         }
 
@@ -37,7 +48,10 @@ namespace ELTBackend.Controllers
         [HttpGet("employees")]
         public async Task<ActionResult<ApiResponse>> GetAllEmployees()
         {
-            return Ok(ResponseHelper.Success(data: await _userService.GetAllEmployeesAsync()));
+            _logger.LogInformation("Employee list requested by Admin");
+            var employees = await _userService.GetAllEmployeesAsync();
+
+            return Ok(ResponseHelper.Success(data: employees));
         }
 
         // PATCH: api/users/{id:Guid}
@@ -48,11 +62,13 @@ namespace ELTBackend.Controllers
             [FromBody] UserUpdateDto userUpdateDto
         )
         {
-            return Ok(
-                ResponseHelper.Success(
-                    data: await _userService.UpdateUserByIdAsync(id, userUpdateDto)
-                )
-            );
+            _logger.LogInformation("User update requested. UserId={UserId}", id);
+
+            var updatedUser = await _userService.UpdateUserByIdAsync(id, userUpdateDto);
+
+            _logger.LogInformation("User updated successfully. UserId={UserId}", id);
+
+            return Ok(ResponseHelper.Success(data: updatedUser));
         }
 
         // DELETE: api/users/{id:Guid}
@@ -60,7 +76,12 @@ namespace ELTBackend.Controllers
         [HttpDelete("{id:Guid}")]
         public async Task<ActionResult<ApiResponse>> DeleteUserByIdAsync([FromRoute] Guid id)
         {
+            _logger.LogWarning("User deactivation requested. UserId={UserId}", id);
+
             await _userService.DeactivateUserByIdAsync(id);
+
+            _logger.LogInformation("User deactivated successfully. UserId={UserId}", id);
+
             return Ok(ResponseHelper.Success());
         }
 
